@@ -30,16 +30,28 @@ in
       nativeBuildInputs = [ nodejs pnpm ] ++ extraBuildInputs;
 
       configurePhase = ''
+        runHook preConfigure
+
         pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
         pnpm install --frozen-lockfile --offline
+
+        runHook postConfigure
       '';
 
       buildPhase = ''
+        runHook preBuild
+
         pnpm run ${script}
+
+        runHook postBuild
       '';
 
       installPhase = ''
+        runHook preInstall
+
         mv ${distDir} $out
+
+        runHook postInstall
       '';
 
     } // attrs);
