@@ -30,7 +30,7 @@ in
 
       configurePhase = ''
         pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
-        pnpm install --frozen-lockfile --offline --shamefully-hoist
+        pnpm install --frozen-lockfile --offline
       '';
 
       buildPhase = ''
