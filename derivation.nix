@@ -22,11 +22,11 @@ in
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
-    ,
+    , extraBuildInputs ? []
     }@attrs: stdenv.mkDerivation ({
       inherit src name;
 
-      buildInputs = [ nodejs pnpm ];
+      nativeBuildInputs = [ nodejs pnpm ] ++ extraBuildInputs;
 
       configurePhase = ''
         pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
