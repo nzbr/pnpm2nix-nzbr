@@ -23,6 +23,7 @@ in
     , script ? "build"
     , distDir ? "dist"
     , extraBuildInputs ? []
+    , ...
     }@attrs: stdenv.mkDerivation ({
       inherit src name;
 
