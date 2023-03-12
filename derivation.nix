@@ -2,6 +2,7 @@
 , stdenv
 , nodejs
 , callPackage
+, runCommand
 , ...
 }:
 
@@ -22,9 +23,45 @@ in
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
+    , copyNodeModules ? false
     , extraBuildInputs ? [ ]
     , ...
-    }@attrs: stdenv.mkDerivation ({
+    }@attrs:
+    let
+      pnpmStore = runCommand "${name}-pnpm-store" {
+        nativeBuildInputs = [ nodejs pnpm ];
+       } ''
+        mkdir -p $out
+
+        store=$(pnpm store path)
+        mkdir -p $(dirname $store)
+        ln -s $out $(pnpm store path)
+
+        pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
+      '';
+
+      nodeModules = stdenv.mkDerivation {
+        name = "${name}-node-modules";
+        nativeBuildInputs = [ nodejs pnpm ];
+
+        unpackPhase = ''
+          cp ${packageJSON} package.json
+          cp ${pnpmLockYaml} pnpm-lock.yaml
+        '';
+
+        buildPhase = ''
+          store=$(pnpm store path)
+          mkdir -p $(dirname $store)
+          ln -s ${pnpmStore} $(pnpm store path)
+          pnpm install --frozen-lockfile --offline
+        '';
+
+        installPhase = ''
+          cp -r node_modules/. $out
+        '';
+      };
+    in
+    stdenv.mkDerivation ({
       inherit src name;
 
       nativeBuildInputs = [ nodejs pnpm ] ++ extraBuildInputs;
@@ -32,8 +69,10 @@ in
       configurePhase = ''
         runHook preConfigure
 
-        pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
-        pnpm install --frozen-lockfile --offline
+        ${if !copyNodeModules
+          then "ln -s"
+          else "cp -r"
+        } ${nodeModules}/. node_modules
 
         runHook postConfigure
       '';
