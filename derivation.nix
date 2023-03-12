@@ -22,7 +22,7 @@ in
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
-    , extraBuildInputs ? []
+    , extraBuildInputs ? [ ]
     , ...
     }@attrs: stdenv.mkDerivation ({
       inherit src name;
