@@ -24,5 +24,9 @@ jobs:
             substituters = https://nzbr-nix-cache.s3.eu-central-1.wasabisys.com https://cache.nixos.org/
 
       - name: Build ❄️
-        run: |
-          nix build -L .#example |& sed -uE 's/^(trace: +)?warning:(\s+|$)/::warning::/;s/^(trace: +)?error:(\s+|$)/::error::/;s/^trace:(\s+|$)/::notice::trace: /'
+        uses: nzbr/actions/nix-build@main
+        with:
+          expression: .#example
+          cache: true
+          cache-tag: pnpm2nix-example
+          secret-key: ${{ secrets.SECRET_DECRYPTION_KEY }}
