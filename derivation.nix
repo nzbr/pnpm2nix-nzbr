@@ -24,6 +24,7 @@ in
     , script ? "build"
     , distDir ? "dist"
     , copyNodeModules ? false
+    , copyPnpmStore ? true
     , extraBuildInputs ? [ ]
     , ...
     }@attrs:
@@ -53,7 +54,13 @@ in
         buildPhase = ''
           store=$(pnpm store path)
           mkdir -p $(dirname $store)
-          ln -s ${pnpmStore} $(pnpm store path)
+          # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
+
+          ${if !copyPnpmStore
+          then "ln -s"
+          else "cp -RL"
+           } ${pnpmStore} $(pnpm store path)
+
           pnpm install --frozen-lockfile --offline
         '';
 
