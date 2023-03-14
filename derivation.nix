@@ -23,8 +23,9 @@ in
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
-    , copyNodeModules ? false
     , copyPnpmStore ? true
+    , copyNodeModules ? false
+    , extraNodeModuleSources ? [ ]
     , extraBuildInputs ? [ ]
     , ...
     }@attrs:
@@ -47,19 +48,29 @@ in
         nativeBuildInputs = [ nodejs pnpm ];
 
         unpackPhase = ''
-          cp ${packageJSON} package.json
-          cp ${pnpmLockYaml} pnpm-lock.yaml
+          ${concatStringsSep "\n" (
+            map (v:
+              let
+                nv = if isAttrs v then v else { name = "."; value = v; };
+              in
+              "cp -vr ${nv.value} ${nv.name}"
+            )
+            ([
+              { name = "package.json"; value = packageJSON; }
+              { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
+            ] ++ extraNodeModuleSources)
+          )}
         '';
 
         buildPhase = ''
           store=$(pnpm store path)
           mkdir -p $(dirname $store)
-          # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
 
+          # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
           ${if !copyPnpmStore
-          then "ln -s"
-          else "cp -RL"
-           } ${pnpmStore} $(pnpm store path)
+            then "ln -s"
+            else "cp -RL"
+          } ${pnpmStore} $(pnpm store path)
 
           pnpm install --frozen-lockfile --offline
         '';
@@ -101,5 +112,5 @@ in
         runHook postInstall
       '';
 
-    } // attrs);
+    } // (attrs // { extraNodeModuleSources = null; }));
 }
