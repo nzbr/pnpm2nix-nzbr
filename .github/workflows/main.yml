@@ -1,4 +1,4 @@
-name: 'Build Example'
+name: 'Main'
 
 on:
   push:
@@ -7,26 +7,7 @@ on:
   pull_request: {}
 
 jobs:
-  build:
-    name: Build Example 🛠️
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - uses: cachix/install-nix-action@v20
-        with:
-          extra_nix_config: |
-            access-tokens = github.com=${{ github.token }}
-            trusted-public-keys = nzbr-nix-cache.s3.eu-central-1.wasabisys.com:3BzCCe4Frvvwamd5wibtMAcEKwbVs4y2xKUR2vQ8gIo= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-            substituters = https://nzbr-nix-cache.s3.eu-central-1.wasabisys.com https://cache.nixos.org/
-
-      - name: Build ❄️
-        uses: nzbr/actions/nix-build@main
-        with:
-          expression: .#example
-          cache: ${{ github.ref == 'refs/heads/main' }}
-          cache-tag: pnpm2nix-example
-          secret-key: ${{ secrets.SECRET_DECRYPTION_KEY }}
+  checks:
+    uses: nzbr/actions/.github/workflows/run_checks.yml@main
+    secrets:
+      SECRET_DECRYPTION_KEY: ${{ secrets.SECRET_DECRYPTION_KEY }}

@@ -28,9 +28,10 @@ in
     , ...
     }@attrs:
     let
-      pnpmStore = runCommand "${name}-pnpm-store" {
-        nativeBuildInputs = [ nodejs pnpm ];
-       } ''
+      pnpmStore = runCommand "${name}-pnpm-store"
+        {
+          nativeBuildInputs = [ nodejs pnpm ];
+        } ''
         mkdir -p $out
 
         store=$(pnpm store path)
