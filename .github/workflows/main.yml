@@ -27,6 +27,6 @@ jobs:
         uses: nzbr/actions/nix-build@main
         with:
           expression: .#example
-          cache: true
+          cache: ${{ github.ref == 'refs/heads/main' }}
           cache-tag: pnpm2nix-example
           secret-key: ${{ secrets.SECRET_DECRYPTION_KEY }}
