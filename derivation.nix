@@ -106,6 +106,8 @@ in
                   else "cp -RL"
                 } ${passthru.pnpmStore} $(pnpm store path)
 
+                ${lib.optionalString copyPnpmStore "chmod -R +w $(pnpm store path)"}
+
                 pnpm install --frozen-lockfile --offline
               '';
 
