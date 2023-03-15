@@ -16,8 +16,8 @@ in
     , packageJSON ? src + "/package.json"
     , pnpmLockYaml ? src + "/pnpm-lock.yaml"
     , pname ? (fromJSON (readFile packageJSON)).name
-    , version ? (fromJSON (readFile packageJSON)).version
-    , name ? "${pname}-${version}"
+    , version ? (fromJSON (readFile packageJSON)).version or null
+    , name ? if version != null then "${pname}-${version}" else pname
     , nodejs ? nodePkg
     , pnpm ? nodejs.pkgs.pnpm
     , registry ? "https://registry.npmjs.org"
