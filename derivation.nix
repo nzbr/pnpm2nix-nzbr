@@ -29,88 +29,93 @@ in
     , extraBuildInputs ? [ ]
     , ...
     }@attrs:
-    let
-      pnpmStore = runCommand "${name}-pnpm-store"
-        {
-          nativeBuildInputs = [ nodejs pnpm ];
-        } ''
-        mkdir -p $out
+    stdenv.mkDerivation (
+      recursiveUpdate
+        (rec {
+          inherit src name;
 
-        store=$(pnpm store path)
-        mkdir -p $(dirname $store)
-        ln -s $out $(pnpm store path)
+          nativeBuildInputs = [ nodejs pnpm ] ++ extraBuildInputs;
 
-        pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
-      '';
+          configurePhase = ''
+            runHook preConfigure
 
-      nodeModules = stdenv.mkDerivation {
-        name = "${name}-node-modules";
-        nativeBuildInputs = [ nodejs pnpm ];
+            ${if !copyNodeModules
+              then "ln -s"
+              else "cp -r"
+            } ${passthru.nodeModules}/. node_modules
 
-        unpackPhase = ''
-          ${concatStringsSep "\n" (
-            map (v:
-              let
-                nv = if isAttrs v then v else { name = "."; value = v; };
-              in
-              "cp -vr ${nv.value} ${nv.name}"
-            )
-            ([
-              { name = "package.json"; value = packageJSON; }
-              { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
-            ] ++ extraNodeModuleSources)
-          )}
-        '';
+            runHook postConfigure
+          '';
 
-        buildPhase = ''
-          store=$(pnpm store path)
-          mkdir -p $(dirname $store)
+          buildPhase = ''
+            runHook preBuild
 
-          # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
-          ${if !copyPnpmStore
-            then "ln -s"
-            else "cp -RL"
-          } ${pnpmStore} $(pnpm store path)
+            pnpm run ${script}
 
-          pnpm install --frozen-lockfile --offline
-        '';
+            runHook postBuild
+          '';
 
-        installPhase = ''
-          cp -r node_modules/. $out
-        '';
-      };
-    in
-    stdenv.mkDerivation ({
-      inherit src name;
+          installPhase = ''
+            runHook preInstall
 
-      nativeBuildInputs = [ nodejs pnpm ] ++ extraBuildInputs;
+            mv ${distDir} $out
 
-      configurePhase = ''
-        runHook preConfigure
+            runHook postInstall
+          '';
 
-        ${if !copyNodeModules
-          then "ln -s"
-          else "cp -r"
-        } ${nodeModules}/. node_modules
+          passthru = {
+            pnpmStore = runCommand "${name}-pnpm-store"
+              {
+                nativeBuildInputs = [ nodejs pnpm ];
+              } ''
+              mkdir -p $out
 
-        runHook postConfigure
-      '';
+              store=$(pnpm store path)
+              mkdir -p $(dirname $store)
+              ln -s $out $(pnpm store path)
 
-      buildPhase = ''
-        runHook preBuild
+              pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
+            '';
 
-        pnpm run ${script}
+            nodeModules = stdenv.mkDerivation {
+              name = "${name}-node-modules";
+              nativeBuildInputs = [ nodejs pnpm ];
 
-        runHook postBuild
-      '';
+              unpackPhase = ''
+                ${concatStringsSep "\n" (
+                  map (v:
+                    let
+                      nv = if isAttrs v then v else { name = "."; value = v; };
+                    in
+                    "cp -vr ${nv.value} ${nv.name}"
+                  )
+                  ([
+                    { name = "package.json"; value = packageJSON; }
+                    { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
+                  ] ++ extraNodeModuleSources)
+                )}
+              '';
 
-      installPhase = ''
-        runHook preInstall
+              buildPhase = ''
+                store=$(pnpm store path)
+                mkdir -p $(dirname $store)
 
-        mv ${distDir} $out
+                # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
+                ${if !copyPnpmStore
+                  then "ln -s"
+                  else "cp -RL"
+                } ${passthru.pnpmStore} $(pnpm store path)
 
-        runHook postInstall
-      '';
+                pnpm install --frozen-lockfile --offline
+              '';
 
-    } // (attrs // { extraNodeModuleSources = null; }));
+              installPhase = ''
+                cp -r node_modules/. $out
+              '';
+            };
+          };
+
+        })
+        (attrs // { extraNodeModuleSources = null; })
+    );
 }
