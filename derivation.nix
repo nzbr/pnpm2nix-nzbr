@@ -23,6 +23,7 @@ in
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
+    , isolatePackageDefinition ? true
     , copyPnpmStore ? true
     , copyNodeModules ? false
     , extraNodeModuleSources ? [ ]
@@ -38,6 +39,8 @@ in
 
           configurePhase = ''
             runHook preConfigure
+
+            export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
 
             ${if !copyNodeModules
               then "ln -s"
@@ -82,21 +85,47 @@ in
               nativeBuildInputs = [ nodejs pnpm ];
 
               unpackPhase = ''
-                ${concatStringsSep "\n" (
-                  map (v:
-                    let
-                      nv = if isAttrs v then v else { name = "."; value = v; };
-                    in
-                    "cp -vr ${nv.value} ${nv.name}"
-                  )
-                  ([
-                    { name = "package.json"; value = packageJSON; }
-                    { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
-                  ] ++ extraNodeModuleSources)
-                )}
+                ${
+                  if isolatePackageDefinition
+                    then
+                      concatStringsSep "\n"
+                        (
+                          map
+                            (v:
+                              let
+                                nv = if isAttrs v then v else { name = "."; value = v; };
+                              in
+                              "cp -vr ${nv.value} ${nv.name}"
+                            )
+                            ([
+                              { name = "package.json"; value = packageJSON; }
+                              { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
+                            ] ++ extraNodeModuleSources)
+                        )
+                    else
+                      let
+                        unpackedSrc = stdenv.mkDerivation {
+                          name = "${name}-unpacked-src";
+
+                          inherit src;
+
+                          buildPhase = "true";
+                          installPhase = ''
+                            mkdir -p $out
+                            cp -r . $out
+                          '';
+                        };
+                      in
+                      ''
+                        cp -vr ${unpackedSrc}/. .
+                        chmod -R +w .
+                      ''
+                  }
               '';
 
               buildPhase = ''
+                export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
+
                 store=$(pnpm store path)
                 mkdir -p $(dirname $store)
 
