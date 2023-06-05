@@ -7,10 +7,9 @@
 
 with lib;
 let
-  fixVersion = ver: head (splitString "_" ver);
-  splitName = name: tail (splitString "/" name);
-  getVersion = name: fixVersion (last (splitName name));
-  withoutVersion = name: concatStringsSep "/" (init (splitName name));
+  splitVersion = name: splitString "@" (head (splitString "(" name));
+  getVersion = name: last (splitVersion name);
+  withoutVersion = name: concatStringsSep "@" (init (splitVersion name));
 in
 rec {
 
@@ -22,7 +21,7 @@ rec {
         (n: v:
           let
             name = withoutVersion n;
-            baseName = last (init (splitName n));
+            baseName = last (splitString "/" (withoutVersion n));
             version = getVersion n;
           in
           fetchurl {

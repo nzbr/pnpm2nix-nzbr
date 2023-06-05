@@ -1,6 +1,7 @@
 { lib
 , stdenv
 , nodejs
+, pkg-config
 , callPackage
 , runCommand
 , ...
@@ -9,6 +10,7 @@
 with builtins; with lib; with callPackage ./lockfile.nix { };
 let
   nodePkg = nodejs;
+  pkgConfigPkg = pkg-config;
 in
 {
   mkPnpmPackage =
@@ -18,8 +20,6 @@ in
     , pname ? (fromJSON (readFile packageJSON)).name
     , version ? (fromJSON (readFile packageJSON)).version or null
     , name ? if version != null then "${pname}-${version}" else pname
-    , nodejs ? nodePkg
-    , pnpm ? nodejs.pkgs.pnpm
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
@@ -28,6 +28,9 @@ in
     , copyNodeModules ? false
     , extraNodeModuleSources ? [ ]
     , extraBuildInputs ? [ ]
+    , nodejs ? nodePkg
+    , pnpm ? nodejs.pkgs.pnpm
+    , pkg-config ? pkgConfigPkg
     , ...
     }@attrs:
     stdenv.mkDerivation (
@@ -35,12 +38,13 @@ in
         (rec {
           inherit src name;
 
-          nativeBuildInputs = [ nodejs pnpm ] ++ extraBuildInputs;
+          nativeBuildInputs = [ nodejs pnpm pkg-config ] ++ extraBuildInputs;
 
           configurePhase = ''
-            runHook preConfigure
-
             export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
+            export npm_config_nodedir=${nodejs}
+
+            runHook preConfigure
 
             ${if installInPlace
               then passthru.nodeModules.buildPhase
@@ -72,6 +76,8 @@ in
           '';
 
           passthru = {
+            inherit attrs;
+
             pnpmStore = runCommand "${name}-pnpm-store"
               {
                 nativeBuildInputs = [ nodejs pnpm ];
