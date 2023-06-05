@@ -23,7 +23,7 @@ in
     , registry ? "https://registry.npmjs.org"
     , script ? "build"
     , distDir ? "dist"
-    , isolatePackageDefinition ? true
+    , installInPlace ? false
     , copyPnpmStore ? true
     , copyNodeModules ? false
     , extraNodeModuleSources ? [ ]
@@ -42,10 +42,15 @@ in
 
             export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
 
-            ${if !copyNodeModules
-              then "ln -s"
-              else "cp -r"
-            } ${passthru.nodeModules}/. node_modules
+            ${if installInPlace
+              then passthru.nodeModules.buildPhase
+              else ''
+                ${if !copyNodeModules
+                  then "ln -s"
+                  else "cp -r"
+                } ${passthru.nodeModules}/. node_modules
+              ''
+            }
 
             runHook postConfigure
           '';
@@ -84,44 +89,20 @@ in
               name = "${name}-node-modules";
               nativeBuildInputs = [ nodejs pnpm ];
 
-              unpackPhase = ''
-                ${
-                  if isolatePackageDefinition
-                    then
-                      concatStringsSep "\n"
-                        (
-                          map
-                            (v:
-                              let
-                                nv = if isAttrs v then v else { name = "."; value = v; };
-                              in
-                              "cp -vr ${nv.value} ${nv.name}"
-                            )
-                            ([
-                              { name = "package.json"; value = packageJSON; }
-                              { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
-                            ] ++ extraNodeModuleSources)
-                        )
-                    else
+              unpackPhase = concatStringsSep "\n"
+                (
+                  map
+                    (v:
                       let
-                        unpackedSrc = stdenv.mkDerivation {
-                          name = "${name}-unpacked-src";
-
-                          inherit src;
-
-                          buildPhase = "true";
-                          installPhase = ''
-                            mkdir -p $out
-                            cp -r . $out
-                          '';
-                        };
+                        nv = if isAttrs v then v else { name = "."; value = v; };
                       in
-                      ''
-                        cp -vr ${unpackedSrc}/. .
-                        chmod -R +w .
-                      ''
-                  }
-              '';
+                      "cp -vr ${nv.value} ${nv.name}"
+                    )
+                    ([
+                      { name = "package.json"; value = packageJSON; }
+                      { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
+                    ] ++ extraNodeModuleSources)
+                );
 
               buildPhase = ''
                 export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
