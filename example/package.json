@@ -15,7 +15,7 @@
     "copperflame": "github:nzbr/copperflame"
   },
   "devDependencies": {
-    "parcel": "2.8.3",
-    "@parcel/transformer-sass": "2.8.3"
+    "parcel": "2.9.3",
+    "@parcel/transformer-sass": "2.9.3"
   }
 }
