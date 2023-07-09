@@ -2,7 +2,10 @@
 , stdenv
 , nodejs
 , pkg-config
+, yq
 , callPackage
+, writeShellScriptBin
+, writeText
 , runCommand
 , ...
 }:
@@ -33,12 +36,17 @@ in
     , pkg-config ? pkgConfigPkg
     , ...
     }@attrs:
+    let
+      nativeBuildInputs = [
+        nodejs
+        pnpm
+        pkg-config
+      ] ++ extraBuildInputs;
+    in
     stdenv.mkDerivation (
       recursiveUpdate
         (rec {
-          inherit src name;
-
-          nativeBuildInputs = [ nodejs pnpm pkg-config ] ++ extraBuildInputs;
+          inherit src name nativeBuildInputs;
 
           configurePhase = ''
             export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
@@ -78,6 +86,9 @@ in
           passthru = {
             inherit attrs;
 
+            patchedLockfile = patchLockfile pnpmLockYaml;
+            patchedLockfileYaml = writeText "pnpm-lock.yaml" (toJSON passthru.patchedLockfile);
+
             pnpmStore = runCommand "${name}-pnpm-store"
               {
                 nativeBuildInputs = [ nodejs pnpm ];
@@ -88,12 +99,13 @@ in
               mkdir -p $(dirname $store)
               ln -s $out $(pnpm store path)
 
-              pnpm store add ${concatStringsSep " " (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; })}
+              pnpm store add ${concatStringsSep " " (unique (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; }))}
             '';
 
             nodeModules = stdenv.mkDerivation {
               name = "${name}-node-modules";
-              nativeBuildInputs = [ nodejs pnpm ];
+
+              inherit nativeBuildInputs;
 
               unpackPhase = concatStringsSep "\n"
                 (
@@ -106,7 +118,7 @@ in
                     )
                     ([
                       { name = "package.json"; value = packageJSON; }
-                      { name = "pnpm-lock.yaml"; value = pnpmLockYaml; }
+                      { name = "pnpm-lock.yaml"; value = passthru.patchedLockfileYaml; }
                     ] ++ extraNodeModuleSources)
                 );
 
@@ -115,6 +127,8 @@ in
 
                 store=$(pnpm store path)
                 mkdir -p $(dirname $store)
+
+                cp -f ${passthru.patchedLockfileYaml} pnpm-lock.yaml
 
                 # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
                 ${if !copyPnpmStore

@@ -1,0 +1,11 @@
+@use './node_modules/copperflame/css/config' with (
+  $darkmode: false
+);
+@use './node_modules/copperflame/css/elements';
+
+.sheet {
+  @include elements.floating-box;
+
+  width: max-content;
+  margin: auto;
+}
