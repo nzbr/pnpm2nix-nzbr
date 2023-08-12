@@ -50,10 +50,16 @@ rec {
               baseName = last (splitString "/" (withoutVersion n));
               version = getVersion n;
             in
-            fetchurl {
-              url = "${registry}/${name}/-/${baseName}-${version}.tgz";
-              sha512 = v.resolution.integrity;
-            }
+            fetchurl (
+              {
+                url = "${registry}/${name}/-/${baseName}-${version}.tgz";
+              } // (
+                if hasPrefix "sha1-" v.resolution.integrity then
+                  { sha1 = v.resolution.integrity; }
+                else
+                  { sha512 = v.resolution.integrity; }
+              )
+            )
           else
             gitTarball n v
         )
