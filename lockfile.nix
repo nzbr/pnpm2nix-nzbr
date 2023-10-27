@@ -52,7 +52,7 @@ rec {
             in
             fetchurl (
               {
-                url = "${registry}/${name}/-/${baseName}-${version}.tgz";
+                url = v.resolution.tarball or "${registry}/${name}/-/${baseName}-${version}.tgz";
               } // (
                 if hasPrefix "sha1-" v.resolution.integrity then
                   { sha1 = v.resolution.integrity; }
