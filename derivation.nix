@@ -42,11 +42,17 @@ in
         pnpm
         pkg-config
       ] ++ extraBuildInputs;
+      patchedLockfile = patchLockfile pnpmLockYaml;
+      patchedLockfileYaml = writeText "pnpm-lock.yaml" (toJSON passthru.patchedLockfile);
     in
     stdenv.mkDerivation (
       recursiveUpdate
         (rec {
           inherit src name nativeBuildInputs;
+
+          unpackPhase = ''
+            pnpm store add ${concatStringsSep " " (unique (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; }))}
+          '';
 
           configurePhase = ''
             export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
@@ -54,17 +60,7 @@ in
 
             runHook preConfigure
 
-            ${if installInPlace
-              then ''
-                ${passthru.nodeModules.unpackPhase}
-                ${passthru.nodeModules.buildPhase}
-              '' else ''
-                ${if !copyNodeModules
-                  then "ln -s"
-                  else "cp -r"
-                } ${passthru.nodeModules}/. node_modules
-              ''
-            }
+            pnpm install --frozen-lockfile --offline
 
             runHook postConfigure
           '';
