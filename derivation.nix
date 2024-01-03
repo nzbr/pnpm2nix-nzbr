@@ -138,7 +138,7 @@ in
 
                 ${lib.optionalString copyPnpmStore "chmod -R +w $(pnpm store path)"}
 
-                pnpm install --frozen-lockfile --offline
+                pnpm install --frozen-lockfile --offline --ignore-scripts
               '';
 
               installPhase = ''
