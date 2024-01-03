@@ -29,6 +29,7 @@ let
             url = "https://${concatStringsSep "/" (init split)}.git";
             rev = (last split);
             shallow = true;
+            allRefs = true;
           };
     in
     # runCommand (last (init (traceValSeq (splitString "/" (traceValSeq (withoutVersion (traceValSeq n))))))) { } ''
