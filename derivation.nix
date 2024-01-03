@@ -43,7 +43,7 @@ in
         pkg-config
       ] ++ extraBuildInputs;
       patchedLockfile = patchLockfile pnpmLockYaml;
-      patchedLockfileYaml = writeText "pnpm-lock.yaml" (toJSON passthru.patchedLockfile);
+      patchedLockfileYaml = writeText "pnpm-lock.yaml" (toJSON patchedLockfile);
     in
     stdenv.mkDerivation (
       recursiveUpdate
