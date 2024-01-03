@@ -23,7 +23,7 @@ let
             }
         else
           let
-            split = splitString "/" v.id;
+            split = splitString "/" n;
           in
           fetchGit {
             url = "https://${concatStringsSep "/" (init split)}.git";
