@@ -50,7 +50,7 @@ in
         (rec {
           inherit src name nativeBuildInputs;
 
-          unpackPhase = ''
+          postUnpack = ''
             pnpm store add ${concatStringsSep " " (unique (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; }))}
           '';
 
