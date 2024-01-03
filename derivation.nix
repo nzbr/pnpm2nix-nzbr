@@ -142,7 +142,7 @@ in
               '';
 
               installPhase = ''
-                cp -rvP node_modules/. $out
+                cp -a node_modules/. $out
               '';
             };
           };
