@@ -55,8 +55,10 @@ in
             runHook preConfigure
 
             ${if installInPlace
-              then passthru.nodeModules.buildPhase
-              else ''
+              then ''
+                ${passthru.nodeModules.unpackPhase}
+                ${passthru.nodeModules.buildPhase}
+              '' else ''
                 ${if !copyNodeModules
                   then "ln -s"
                   else "cp -r"
