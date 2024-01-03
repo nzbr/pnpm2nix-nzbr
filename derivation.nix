@@ -50,17 +50,14 @@ in
         (rec {
           inherit src name nativeBuildInputs;
 
-          postUnpack = ''
-            export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
-            pnpm store add ${concatStringsSep " " (unique (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; }))}
-            cp ${patchedLockfileYaml} "pnpm-lock.yaml"
-          '';
-
           configurePhase = ''
             export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
             export npm_config_nodedir=${nodejs}
 
             runHook preConfigure
+
+            pnpm store add ${concatStringsSep " " (unique (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; }))}
+            cp ${patchedLockfileYaml} "pnpm-lock.yaml"
 
             pnpm install --frozen-lockfile --offline
 
