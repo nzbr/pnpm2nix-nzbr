@@ -2,9 +2,7 @@
 , stdenv
 , nodejs
 , pkg-config
-, yq
 , callPackage
-, writeShellScriptBin
 , writeText
 , runCommand
 , ...
@@ -27,9 +25,11 @@ in
     , script ? "build"
     , distDir ? "dist"
     , installInPlace ? false
+    , installEnv ? { }
+    , noDevDependencies ? false
+    , extraNodeModuleSources ? [ ]
     , copyPnpmStore ? true
     , copyNodeModules ? false
-    , extraNodeModuleSources ? [ ]
     , extraBuildInputs ? [ ]
     , nodejs ? nodePkg
     , pnpm ? nodejs.pkgs.pnpm
@@ -78,76 +78,86 @@ in
           installPhase = ''
             runHook preInstall
 
-            mv ${distDir} $out
+            ${if distDir == "." then "cp -r" else "mv"} ${distDir} $out
 
             runHook postInstall
           '';
 
-          passthru = {
-            inherit attrs;
+          passthru =
+            let
+              processResult = processLockfile { inherit registry noDevDependencies; lockfile = pnpmLockYaml; };
+            in
+            {
+              inherit attrs;
 
-            patchedLockfile = patchLockfile pnpmLockYaml;
-            patchedLockfileYaml = writeText "pnpm-lock.yaml" (toJSON passthru.patchedLockfile);
+              patchedLockfile = processResult.patchedLockfile;
+              patchedLockfileYaml = writeText "pnpm-lock.yaml" (toJSON passthru.patchedLockfile);
 
-            pnpmStore = runCommand "${name}-pnpm-store"
-              {
-                nativeBuildInputs = [ nodejs pnpm ];
-              } ''
-              mkdir -p $out
-
-              store=$(pnpm store path)
-              mkdir -p $(dirname $store)
-              ln -s $out $(pnpm store path)
-
-              pnpm store add ${concatStringsSep " " (unique (dependencyTarballs { inherit registry; lockfile = pnpmLockYaml; }))}
-            '';
-
-            nodeModules = stdenv.mkDerivation {
-              name = "${name}-node-modules";
-
-              inherit nativeBuildInputs;
-
-              unpackPhase = concatStringsSep "\n"
-                (
-                  map
-                    (v:
-                      let
-                        nv = if isAttrs v then v else { name = "."; value = v; };
-                      in
-                      "cp -vr ${nv.value} ${nv.name}"
-                    )
-                    ([
-                      { name = "package.json"; value = packageJSON; }
-                      { name = "pnpm-lock.yaml"; value = passthru.patchedLockfileYaml; }
-                    ] ++ extraNodeModuleSources)
-                );
-
-              buildPhase = ''
-                export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
+              pnpmStore = runCommand "${name}-pnpm-store"
+                {
+                  nativeBuildInputs = [ nodejs pnpm ];
+                } ''
+                mkdir -p $out
 
                 store=$(pnpm store path)
                 mkdir -p $(dirname $store)
+                ln -s $out $(pnpm store path)
 
-                cp -f ${passthru.patchedLockfileYaml} pnpm-lock.yaml
-
-                # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
-                ${if !copyPnpmStore
-                  then "ln -s"
-                  else "cp -RL"
-                } ${passthru.pnpmStore} $(pnpm store path)
-
-                ${lib.optionalString copyPnpmStore "chmod -R +w $(pnpm store path)"}
-
-                pnpm install --frozen-lockfile --offline
+                pnpm store add ${concatStringsSep " " (unique processResult.dependencyTarballs)}
               '';
 
-              installPhase = ''
-                cp -r node_modules/. $out
-              '';
+              nodeModules = stdenv.mkDerivation {
+                name = "${name}-node-modules";
+
+                inherit nativeBuildInputs;
+
+                unpackPhase = concatStringsSep "\n"
+                  (
+                    map
+                      (v:
+                        let
+                          nv = if isAttrs v then v else { name = "."; value = v; };
+                        in
+                        "cp -vr ${nv.value} ${nv.name}"
+                      )
+                      ([
+                        { name = "package.json"; value = packageJSON; }
+                        { name = "pnpm-lock.yaml"; value = passthru.patchedLockfileYaml; }
+                      ] ++ extraNodeModuleSources)
+                  );
+
+                buildPhase = ''
+                  export HOME=$NIX_BUILD_TOP # Some packages need a writable HOME
+
+                  store=$(pnpm store path)
+                  mkdir -p $(dirname $store)
+
+                  cp -f ${passthru.patchedLockfileYaml} pnpm-lock.yaml
+
+                  # solve pnpm: EACCES: permission denied, copyfile '/build/.pnpm-store
+                  ${if !copyPnpmStore
+                    then "ln -s"
+                    else "cp -RL"
+                  } ${passthru.pnpmStore} $(pnpm store path)
+
+                  ${lib.optionalString copyPnpmStore "chmod -R +w $(pnpm store path)"}
+
+                  ${concatStringsSep "\n" (
+                    mapAttrsToList
+                      (n: v: ''export ${n}="${v}"'')
+                      installEnv
+                  )}
+
+                  pnpm install ${optionalString noDevDependencies "--prod "}--frozen-lockfile --offline
+                '';
+
+                installPhase = ''
+                  cp -r node_modules/. $out
+                '';
+              };
             };
-          };
 
         })
-        (attrs // { extraNodeModuleSources = null; })
+        (attrs // { extraNodeModuleSources = null; installEnv = null; })
     );
 }

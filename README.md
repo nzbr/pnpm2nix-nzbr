@@ -20,7 +20,9 @@ In addition to all arguments accepted by `stdenv.mkDerivation`, the `mkPnpmPacka
 | `script`                 | The npm script that is executed                                             | `build`                      |
 | `distDir`                | The directory that should be copied to the output                           | `dist`                       |
 | `installInPlace`         | Run `pnpm install` in the source directory instead of a separate derivation | `false`                      |
+| `installEnv`             | Environment variables that should be present during `pnpm install`          | `{}`                         |
+| `noDevDependencies`      | Only download and install `dependencies`, not `devDependencies`             | `false`                      |
+| `extraNodeModuleSources` | Additional files that should be available during `pnpm install`             | `[]`                         |
 | `copyPnpmStore`          | Copy the pnpm store into the build directory instead of linking it          | `true`                       |
 | `copyNodeModules`        | Copy the `node_modules` into the build directory instead of linking it      | `false`                      |
-| `extraNodeModuleSources` | Additional files that should be available during `pnpm install`             | `[]`                         |
 | `extraBuildInputs`       | Additional entries for `nativeBuildInputs`                                  | `[]`                         |
