@@ -60,7 +60,7 @@ in
                 ${if !copyNodeModules
                   then "ln -s"
                   else "cp -r"
-                } ${passthru.nodeModules}/. node_modules
+                } ${passthru.nodeModules}/node_modules node_modules
               ''
             }
 
@@ -152,7 +152,8 @@ in
                 '';
 
                 installPhase = ''
-                  cp -r node_modules/. $out
+                  mkdir -p $out
+                  cp -r node_modules/. $out/node_modules
                 '';
               };
             };
