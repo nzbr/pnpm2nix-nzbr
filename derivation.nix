@@ -26,6 +26,7 @@ in
     , distDir ? "dist"
     , installInPlace ? false
     , installEnv ? { }
+    , buildEnv ? { }
     , noDevDependencies ? false
     , extraNodeModuleSources ? [ ]
     , copyPnpmStore ? true
@@ -68,6 +69,12 @@ in
           '';
 
           buildPhase = ''
+            ${concatStringsSep "\n" (
+              mapAttrsToList
+                (n: v: ''export ${n}="${v}"'')
+                buildEnv
+            )}
+
             runHook preBuild
 
             pnpm run ${script}
@@ -159,6 +166,6 @@ in
             };
 
         })
-        (attrs // { extraNodeModuleSources = null; installEnv = null; })
+        (attrs // { extraNodeModuleSources = null; installEnv = null; buildEnv = null;})
     );
 }
