@@ -33,6 +33,9 @@ in
     , script ? "build"
     , distDir ? "dist"
     , distDirs ? (if workspace == null then [distDir] else (map (c: "${c}/dist") components))
+    , distDirIsOut ? true
+    , installNodeModules ? false
+    , installPackageFiles ? false
     , installInPlace ? false
     , installEnv ? { }
     , buildEnv ? { }
@@ -76,6 +79,14 @@ in
           ]
         ) ++ extraNodeModuleSources;
       # Computed values that loop over something
+      computedDistFiles =
+        let
+          packageFileNames = ["pnpm-lock.yaml"] ++
+            map ({ name, ... }: name) packageFilesWithoutLockfile;
+        in
+          distDirs ++
+            optionals installNodeModules nodeModulesDirs ++
+            optionals installPackageFiles packageFileNames;
       nodeModulesDirs =
         if isWorkspace then
           ["node_modules"] ++ (map (c: "${c}/node_modules") components)
@@ -90,7 +101,7 @@ in
       # Flag derived from value computed above, indicating the single dist
       # should be copied as $out directly, rather than $out/${distDir}
       computedDistDirIsOut =
-        length distDirs == 1 && !isWorkspace;
+        length computedDistFiles == 1 && distDirIsOut && !isWorkspace;
     in
     stdenv.mkDerivation (
       recursiveUpdate
@@ -148,7 +159,7 @@ in
                 mkdir -p $out
                 ${forEachConcat (dDir: ''
                     cp -r --parents ${dDir} $out
-                  '') distDirs
+                  '') computedDistFiles
                 }
               ''
             }
