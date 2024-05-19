@@ -15,79 +15,60 @@ rec {
       splitVersion = name: splitString "@" (head (splitString "(" name));
       getVersion = name: last (splitVersion name);
       withoutVersion = name: concatStringsSep "@" (init (splitVersion name));
-      switch = options:
-        if ((length options) == 0)
-        then throw "No matching case found!"
-        else
-          if ((head options).case or true)
-          then (head options).result
-          else switch (tail options);
       mkTarball = pkg: contents:
         runCommand "${last (init (splitString "/" (head (splitString "(" pkg))))}.tgz" { } ''
           tar -czf $out -C ${contents} .
         '';
       findTarball = n: v:
-        switch [
-          {
-            case = (v.resolution.type or "") == "git";
-            result =
-              mkTarball n (
-                fetchGit {
-                  url = v.resolution.repo;
-                  rev = v.resolution.commit;
-                  shallow = true;
-                }
-              );
-          }
-          {
-            case = hasAttrByPath [ "resolution" "tarball" ] v && hasAttrByPath [ "resolution" "integrity" ] v;
-            result = fetchurl {
+        if (v.resolution.type or "") == "git" then
+          mkTarball n
+            (
+              fetchGit {
+                url = v.resolution.repo;
+                rev = v.resolution.commit;
+                shallow = true;
+              }
+            )
+        else if hasAttrByPath [ "resolution" "tarball" ] v && hasAttrByPath [ "resolution" "integrity" ] v then
+          fetchurl
+            {
               url = v.resolution.tarball;
               ${head (splitString "-" v.resolution.integrity)} = v.resolution.integrity;
-            };
+            }
+        else if hasPrefix "https://codeload.github.com" (v.resolution.tarball or "") then
+          let
+            m = strings.match "https://codeload.github.com/([^/]+)/([^/]+)/tar\\.gz/([a-f0-9]+)" v.resolution.tarball;
+          in
+          mkTarball n (
+            fetchGit {
+              url = "https://github.com/${elemAt m 0}/${elemAt m 1}";
+              rev = (elemAt m 2);
+              shallow = true;
+            }
+          )
+        else if (v ? id) then
+          let
+            split = splitString "/" v.id;
+          in
+          mkTarball n (
+            fetchGit {
+              url = "https://${concatStringsSep "/" (init split)}.git";
+              rev = (last split);
+              shallow = true;
+            }
+          )
+        else if hasPrefix "/" n then
+          let
+            name = withoutVersion n;
+            baseName = last (splitString "/" (withoutVersion n));
+            version = getVersion n;
+          in
+          fetchurl {
+            url = "${registry}/${name}/-/${baseName}-${version}.tgz";
+            ${head (splitString "-" v.resolution.integrity)} = v.resolution.integrity;
           }
-          {
-            case = hasPrefix "https://codeload.github.com" (v.resolution.tarball or "");
-            result =
-              let
-                m = strings.match "https://codeload.github.com/([^/]+)/([^/]+)/tar\\.gz/([a-f0-9]+)" v.resolution.tarball;
-              in
-              mkTarball n (
-                fetchGit {
-                  url = "https://github.com/${elemAt m 0}/${elemAt m 1}";
-                  rev = (elemAt m 2);
-                  shallow = true;
-                }
-              );
-          }
-          {
-            case = (v ? id);
-            result =
-              let
-                split = splitString "/" v.id;
-              in
-              mkTarball n (
-                fetchGit {
-                  url = "https://${concatStringsSep "/" (init split)}.git";
-                  rev = (last split);
-                  shallow = true;
-                }
-              );
-          }
-          {
-            case = hasPrefix "/" n;
-            result =
-              let
-                name = withoutVersion n;
-                baseName = last (splitString "/" (withoutVersion n));
-                version = getVersion n;
-              in
-              fetchurl {
-                url = "${registry}/${name}/-/${baseName}-${version}.tgz";
-                ${head (splitString "-" v.resolution.integrity)} = v.resolution.integrity;
-              };
-          }
-        ];
+        else
+          throw "no match found for ${n}";
     in
     {
       dependencyTarballs =
