@@ -75,12 +75,13 @@ rec {
               );
           }
           {
-            case = hasPrefix "/" n;
+            case = true;
             result =
               let
-                name = withoutVersion n;
-                baseName = last (splitString "/" (withoutVersion n));
-                version = getVersion n;
+                n_ = if hasPrefix "/" n then removePrefix "/" n else n;
+                name = withoutVersion n_;
+                baseName = last (splitString "/" name);
+                version = getVersion n_;
               in
               fetchurl {
                 url = "${registry}/${name}/-/${baseName}-${version}.tgz";
